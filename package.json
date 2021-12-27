@@ -1,7 +1,9 @@
 {
   "name": "malloc-tools",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Exposes glibc's malloc APIs for stats and trim",
+  "homepage": "https://github.com/alxvasilev/malloc-tools#readme",
+  "repo": "https://github.com/alxvasilev/malloc-tools",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -9,8 +11,6 @@
   "author": "Alexander Vassilev",
   "license": "BSD",
   "dependencies": {
-    "fast-xml-parser": "^4.0.0-beta.8",
-    "node-addon-api": "*",
-    "xml2js": "^0.4.23"
+    "node-addon-api": "*"
   }
 }
