@@ -50,7 +50,7 @@ void mallocStats(const CallbackInfo& info) {
 
 // Fix integer wrapping when value is > 2G
 #if __GLIBC_MINOR__ < 33
-  inline size_t fixWrap(int val) { return ((val < 0) ? (INT_MAX - val) : val); }
+  inline size_t fixWrap(int val) { return ((val < 0) ? ((size_t)INT_MAX - val) : val); }
 #else
   inline size_t fixWrap(size_t val) { return val; }
 #endif
