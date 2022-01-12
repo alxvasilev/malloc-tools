@@ -2,6 +2,7 @@
 #include <napi.h>
 #include <malloc.h>
 #include <features.h>
+#include <climits>
 
 using namespace Napi;
 
@@ -47,25 +48,32 @@ void mallocStats(const CallbackInfo& info) {
     malloc_stats();
 }
 
+// Fix integer wrapping when value is > 2G
+#if __GLIBC_MINOR__ < 33
+  inline size_t fixWrap(int val) { return ((val < 0) ? (INT_MAX - val) : val); }
+#else
+  inline size_t fixWrap(size_t val) { return val; }
+#endif
+
 Value mallInfo2(const CallbackInfo& info) {
+    Env env = info.Env();
+    Object obj = Object::New(env);
 #if __GLIBC_MINOR__ < 33
 #warning Glibc version is older than 2.33, will use mallinfo instead of mallinfo2
     auto stats = mallinfo();
 #else
     auto stats = mallinfo2();
 #endif
-    Env env = info.Env();
-    Object obj = Object::New(env);
-    obj.Set("arena", stats.arena);      /* Non-mmapped space allocated (bytes) */
-    obj.Set("ordblks", stats.ordblks);  /* Number of free chunks */
-    obj.Set("smblks", stats.smblks);    /* Number of free fastbin blocks */
-    obj.Set("hblks", stats.hblks);      /* Number of mmapped regions */
-    obj.Set("hblkhd", stats.hblkhd);     /* Space allocated in mmapped regions (bytes) */
-    obj.Set("usmblks", stats.usmblks);   /* See below */
-    obj.Set("fsmblks", stats.fsmblks);   /* Space in freed fastbin blocks (bytes) */
-    obj.Set("uordblks", stats.uordblks); /* Total allocated space (bytes) */
-    obj.Set("fordblks", stats.fordblks); /* Total free space (bytes) */
-    obj.Set("keepcost", stats.keepcost); /* Top-most, releasable space (bytes) */
+    obj.Set("arena", fixWrap(stats.arena));      /* Non-mmapped space allocated (bytes) */
+    obj.Set("ordblks", fixWrap(stats.ordblks));  /* Number of free chunks */
+    obj.Set("smblks", fixWrap(stats.smblks));    /* Number of free fastbin blocks */
+    obj.Set("hblks", fixWrap(stats.hblks));      /* Number of mmapped regions */
+    obj.Set("hblkhd", fixWrap(stats.hblkhd));     /* Space allocated in mmapped regions (bytes) */
+    obj.Set("usmblks", fixWrap(stats.usmblks));   /* See below */
+    obj.Set("fsmblks", fixWrap(stats.fsmblks));   /* Space in freed fastbin blocks (bytes) */
+    obj.Set("uordblks", fixWrap(stats.uordblks)); /* Total allocated space (bytes) */
+    obj.Set("fordblks", fixWrap(stats.fordblks)); /* Total free space (bytes) */
+    obj.Set("keepcost", fixWrap(stats.keepcost)); /* Top-most, releasable space (bytes) */
     return obj;
 }
 Value mallocTrim(const CallbackInfo& info) {
