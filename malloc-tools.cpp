@@ -3,9 +3,11 @@
 #include <malloc.h>
 #include <features.h>
 #include <climits>
+#include <string.h>
 
 using namespace Napi;
 
+// standard malloc stuff
 class AutoMemFile {
 protected:
     char* mBuf = nullptr;
@@ -59,7 +61,7 @@ Value mallInfo2(const CallbackInfo& info) {
     Env env = info.Env();
     Object obj = Object::New(env);
 #if __GLIBC_MINOR__ < 33
-#warning Glibc version is older than 2.33, will use mallinfo instead of mallinfo2
+    #warning Glibc version is older than 2.33, will use mallinfo instead of mallinfo2
     auto stats = mallinfo();
 #else
     auto stats = mallinfo2();
@@ -90,12 +92,132 @@ Value mallocTrim(const CallbackInfo& info) {
     auto ret = malloc_trim(arg.As<Number>().Int32Value());
     return Number::New(env, ret);
 }
-Object Init(Env env, Object exports) {
-    exports.Set("malloc_info", Function::New(env, mallocInfo));
-    exports.Set("malloc_stats", Function::New(env, mallocStats));
-    exports.Set("mallinfo2", Function::New(env, mallInfo2));
-    exports.Set("malloc_trim", Function::New(env, mallocTrim));
+
+Object mallocCreateNamespace(Env env) {
+    auto ns = Object::New(env);
+    ns.Set("info", Function::New(env, mallocInfo));
+    ns.Set("stats", Function::New(env, mallocStats));
+    ns.Set("mallinfo2", Function::New(env, mallInfo2));
+    ns.Set("trim", Function::New(env, mallocTrim));
+    return ns;
+}
+
+Value mallocGetHeapUsage(const CallbackInfo& info)
+{
+    Env env = info.Env();
+    Object obj = Object::New(env);
+#if __GLIBC_MINOR__ < 33
+    auto stats = mallinfo();
+#else
+    auto stats = mallinfo2();
+#endif
+    obj.Set("used", fixWrap(stats.uordblks)); /* Total allocated space (bytes) */
+    obj.Set("free", fixWrap(stats.fordblks)); /* Total free space (bytes) */
+    return obj;
+}
+// end standard malloc ====
+
+// jemalloc stuff
+extern "C" int __attribute__((weak)) mallctl(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen);
+
+//strerrorname_np is defined in glibc 32
+#if (__GLIBC_MINOR__ < 32)
+    #define strerrorname_np strerror
+#endif
+
+#define THROW_ON_ERROR(err)                                                 \
+    if (err) {                                                              \
+        Error::New(env, strerrorname_np(err)).ThrowAsJavaScriptException(); \
+        return env.Undefined();                                             \
+    }
+
+template <typename T>
+Value jeDoRead(const char* name, Napi::Env& env)
+{
+    T result;
+    size_t len = sizeof(result);
+    auto err = mallctl(name, &result, &len, nullptr, 0);
+    THROW_ON_ERROR(err);
+    return Value::From(env, result);
+}
+template<>
+Value jeDoRead<void>(const char* name, Napi::Env& env)
+{
+    auto err = mallctl(name, nullptr, 0, nullptr, 0);
+    THROW_ON_ERROR(err);
+    return env.Undefined();
+}
+
+template <typename T>
+Value jeRead(const CallbackInfo& info)
+ {
+    Napi::Env env = info.Env();
+    if (info.Length() != 1) {
+        Error::New(env, "Wrong number of arguments, must be 1").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    Value arg = info[0];
+    if (!arg.IsString()) {
+        Error::New(env, "Argument is not a string").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    return jeDoRead<T>(arg.ToString().Utf8Value().c_str(), env);
+}
+
+void jenFlushThreadCache()
+{
+    mallctl("thread.tcache.flush", NULL, NULL, NULL, 0);
+}
+Value jeGetHeapUsage(const CallbackInfo& info)
+{
+    Env env = info.Env();
+    jenFlushThreadCache();
+    size_t used, total;
+    size_t lenUsed = sizeof(used);
+    size_t lenTotal = sizeof(total);
+    // allocated is bytes used by application
+    // active is similar to allocated, but as multiple of page size
+    // mapped is total number of bytes mapped by the allocator
+    // mapped > active > allocated
+    auto err = mallctl("stats.allocated", &used, &lenUsed, nullptr, 0);
+    THROW_ON_ERROR(err);
+    err = mallctl("stats.mapped", &total, &lenTotal, nullptr, 0);
+    THROW_ON_ERROR(err);
+
+    Object obj = Object::New(env);
+    obj.Set("used", used);
+    obj.Set("free", (total >= used) ? total - used : 0);
+    return obj;
+}
+
+Value jeFlushThreadCache(const CallbackInfo& info)
+{
+    jenFlushThreadCache();
+    return info.Env().Undefined();
+}
+Object jeCreateNamespace(Env env) {
+    auto ns = Object::New(env);
+    ns.Set("ctlGetSize", Function::New(env, jeRead<size_t>));
+    ns.Set("ctlGetU64", Function::New(env, jeRead<uint64_t>));
+    ns.Set("ctlGetString", Function::New(env, jeRead<const char*>));
+    ns.Set("ctlGetBool", Function::New(env, jeRead<bool>));
+    ns.Set("flushThreadCache", Function::New(env, jeFlushThreadCache));
+    return ns;
+}
+Object Init(Env env, Object exports)
+{
+    exports.Set("malloc", mallocCreateNamespace(env));
+    if (mallctl) {
+        exports.Set("jemalloc", jeCreateNamespace(env));
+        exports.Set("getHeapUsage", Function::New(env, jeGetHeapUsage));
+        exports.Set("allocator", String::New(env, "jemalloc"));
+    }
+    else {
+        exports.Set("getHeapUsage", Function::New(env, mallocGetHeapUsage));
+        exports.Set("allocator", String::New(env, "malloc"));
+    }
     return exports;
 }
+
 
 NODE_API_MODULE(malloc_tools_native, Init);

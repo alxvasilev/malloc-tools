@@ -1,6 +1,6 @@
 {
   "name": "malloc-tools",
-  "version": "1.0.3",
+  "version": "2.0.2",
   "description": "Exposes glibc's malloc APIs for stats and trim",
   "homepage": "https://github.com/alxvasilev/malloc-tools#readme",
   "repo": "https://github.com/alxvasilev/malloc-tools",
