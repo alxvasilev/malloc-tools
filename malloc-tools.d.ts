@@ -7,6 +7,10 @@
 /** The type of allocator used: currently can be malloc or jemalloc */
 export const allocator: string;
 
+/** Get the version of glibc */
+export const glibcVersion: string;
+
+/** Structure returned by getHeapUsage() */
 export interface HeapUsage {
     used: number;
     free: number;

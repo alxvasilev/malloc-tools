@@ -115,6 +115,8 @@ Value mallocGetHeapUsage(const CallbackInfo& info)
     obj.Set("free", fixWrap(stats.fordblks)); /* Total free space (bytes) */
     return obj;
 }
+#define STRINGIFY_HELPER(x) #x
+#define STRINGIFY(x) STRINGIFY_HELPER(x)
 // end standard malloc ====
 
 // jemalloc stuff
@@ -172,17 +174,37 @@ Value jeGetHeapUsage(const CallbackInfo& info)
 {
     Env env = info.Env();
     jenFlushThreadCache();
-    size_t used, total;
-    size_t lenUsed = sizeof(used);
-    size_t lenTotal = sizeof(total);
-    // allocated is bytes used by application
-    // active is similar to allocated, but as multiple of page size
-    // mapped is total number of bytes mapped by the allocator
-    // mapped > active > allocated
-    auto err = mallctl("stats.allocated", &used, &lenUsed, nullptr, 0);
+    size_t used, total, retained;
+/*
+    see https://github.com/jemalloc/jemalloc/issues/1882#issuecomment-662745494
+    - allocated is bytes used by application
+    - active is similar but includes the whole pages, and is multiple of page size
+    - "Mapped is the sum of regions of virtual address space currently dedicated (internally)
+    to serving some live allocation. Some of those regions have pages we are reasonably confident
+    have not been demand-paged in yet; these count towards mapped, but not resident.
+    Some pages have been touched by user code and then freed, but not yet returned to the OS
+    (we're keeping them around under the hope that we'll be able to serve another allocation out of
+    them soon). These pages don't hold any allocations on them, so they don't count towards mapped;
+    they do however count towards resident."
+    - retained: Total number of bytes in virtual memory mappings that were retained rather
+    than being returned to the operating system via e.g. munmap(2) or similar. Retained virtual
+    memory is typically untouched, decommitted, or purged, so it has no strongly associated
+    physical memory (see extent hooks for details). Retained memory is excluded from mapped
+    memory statistics
+    - mapped > active > allocated
+*/
+    size_t len = sizeof(used);
+    auto err = mallctl("stats.allocated", &used, &len, nullptr, 0);
     THROW_ON_ERROR(err);
-    err = mallctl("stats.mapped", &total, &lenTotal, nullptr, 0);
+
+    len = sizeof(total);
+    err = mallctl("stats.mapped", &total, &len, nullptr, 0);
     THROW_ON_ERROR(err);
+
+    len = sizeof(retained);
+    err = mallctl("stats.retained", &retained, &len, nullptr, 0);
+    THROW_ON_ERROR(err);
+    total += retained;
 
     Object obj = Object::New(env);
     obj.Set("used", used);
@@ -209,6 +231,7 @@ Object jeCreateNamespace(Env env) {
 }
 Object Init(Env env, Object exports)
 {
+    exports.Set("glibcVersion", String::New(env, STRINGIFY(__GLIBC__) "." STRINGIFY(__GLIBC_MINOR__)));
     exports.Set("malloc", mallocCreateNamespace(env));
     if (mallctl) {
         exports.Set("jemalloc", jeCreateNamespace(env));

@@ -7,6 +7,7 @@ try {
 }
 
 async function testMalloc(malloc) {
+    console.log("==== malloc stats ====");
     malloc.stats();
     console.log("=============TRIM==============");
     malloc.trim(0);
@@ -35,7 +36,7 @@ function jeLogBoolParam(name) {
     console.log(`${name}: ${tools.jemalloc.ctlGetBool(name)}`);
 }
 function testJemalloc(jemalloc) {
-    console.log("============= jemalloc values ===============");
+    console.log("============= jemalloc stats ===============");
     console.log("version:", jemalloc.ctlGetString("version"));
     jeLogSizeParam("stats.mapped");
     jeLogSizeParam("stats.allocated");
@@ -50,8 +51,10 @@ function testJemalloc(jemalloc) {
 }
 
 async function main() {
+    console.log("==== common API ====");
+    console.log("glibc version:", tools.glibcVersion);
     console.log("allocator=" + tools.allocator);
-    console.log("Heap usage(common API):", JSON.stringify(tools.getHeapUsage()));
+    console.log("Heap usage:", JSON.stringify(tools.getHeapUsage()));
 
     if (tools.allocator === "malloc") {
         await testMalloc(tools.malloc);
