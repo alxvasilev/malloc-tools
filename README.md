@@ -1,8 +1,5 @@
 # malloc-tools
-NPM module that exports glibc malloc's stats and trim functions
-Functions exported:
- - malloc_info()
- - mallinfo2() (falls back to mallinfo() if glibc is older than 2.33)
- - malloc_stats()
- - malloc_trim()
-For usage example, see test.js
+NPM module that exports statistics and management functions of glibc's malloc and jemalloc
+
+For API documentation, see [malloc-tools.d.ts](malloc-tools.d.ts)
+For usage example, see [test.js](test.js)

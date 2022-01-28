@@ -198,9 +198,12 @@ Value jeFlushThreadCache(const CallbackInfo& info)
 Object jeCreateNamespace(Env env) {
     auto ns = Object::New(env);
     ns.Set("ctlGetSize", Function::New(env, jeRead<size_t>));
+    ns.Set("ctlGetSSize", Function::New(env, jeRead<ssize_t>));
+    ns.Set("ctlGetU32", Function::New(env, jeRead<uint32_t>));
     ns.Set("ctlGetU64", Function::New(env, jeRead<uint64_t>));
     ns.Set("ctlGetString", Function::New(env, jeRead<const char*>));
     ns.Set("ctlGetBool", Function::New(env, jeRead<bool>));
+    ns.Set("ctlGetUnsigned", Function::New(env, jeRead<unsigned>));
     ns.Set("flushThreadCache", Function::New(env, jeFlushThreadCache));
     return ns;
 }

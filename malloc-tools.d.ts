@@ -55,8 +55,11 @@ export namespace jemalloc {
      * in read mode, for the corresponding type
      */
     export function ctlGetSize(name: string): number;
+    export function ctlGetSSize(name: string): number;
     export function ctlGetString(name: string): string;
     export function ctlGetBool(name: string): boolean;
+    export function ctlGetU32(name: string): number;
     export function ctlGetU64(name: string): number;
+    export function ctlGetUnsigned(name: string): number;
     export function flushThreadCache(): void;
 }
