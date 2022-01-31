@@ -5,6 +5,9 @@
 #include <climits>
 #include <string.h>
 
+#define STRINGIFY_HELPER(x) #x
+#define STRINGIFY(x) STRINGIFY_HELPER(x)
+
 using namespace Napi;
 
 // standard malloc stuff
@@ -93,15 +96,6 @@ Value mallocTrim(const CallbackInfo& info) {
     return Number::New(env, ret);
 }
 
-Object mallocCreateNamespace(Env env) {
-    auto ns = Object::New(env);
-    ns.Set("info", Function::New(env, mallocInfo));
-    ns.Set("stats", Function::New(env, mallocStats));
-    ns.Set("mallinfo2", Function::New(env, mallInfo2));
-    ns.Set("trim", Function::New(env, mallocTrim));
-    return ns;
-}
-
 Value mallocGetHeapUsage(const CallbackInfo& info)
 {
     Env env = info.Env();
@@ -112,14 +106,22 @@ Value mallocGetHeapUsage(const CallbackInfo& info)
     auto stats = mallinfo2();
 #endif
     obj.Set("used", fixWrap(stats.uordblks)); /* Total allocated space (bytes) */
-    obj.Set("free", fixWrap(stats.fordblks)); /* Total free space (bytes) */
+    obj.Set("total", fixWrap(stats.arena));   /* Total free + total allocated */
     return obj;
 }
-#define STRINGIFY_HELPER(x) #x
-#define STRINGIFY(x) STRINGIFY_HELPER(x)
-// end standard malloc ====
 
-// jemalloc stuff
+Object mallocCreateNamespace(Env env) {
+    auto ns = Object::New(env);
+    ns.Set("info", Function::New(env, mallocInfo));
+    ns.Set("stats", Function::New(env, mallocStats));
+    ns.Set("mallinfo2", Function::New(env, mallInfo2));
+    ns.Set("trim", Function::New(env, mallocTrim));
+    ns.Set("heapUsage", Function::New(env, mallocGetHeapUsage));
+    return ns;
+}
+// ==== end standard malloc ====
+
+// ==== jemalloc stuff ====
 extern "C" int __attribute__((weak)) mallctl(const char *name, void *oldp, size_t *oldlenp, void *newp, size_t newlen);
 
 //strerrorname_np is defined in glibc 32
@@ -208,7 +210,7 @@ Value jeGetHeapUsage(const CallbackInfo& info)
 
     Object obj = Object::New(env);
     obj.Set("used", used);
-    obj.Set("free", (total >= used) ? total - used : 0);
+    obj.Set("total", total);
     return obj;
 }
 

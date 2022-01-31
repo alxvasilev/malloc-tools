@@ -13,7 +13,7 @@ export const glibcVersion: string;
 /** Structure returned by getHeapUsage() */
 export interface HeapUsage {
     used: number;
-    free: number;
+    total: number;
 }
 /** Allocator-independent function to get basic heap usage statistics */
 export function getHeapUsage(): HeapUsage;
@@ -52,6 +52,12 @@ export namespace malloc {
 
     /** Binding for malloc_trim() */
     export function trim(pad: number): number;
+
+    /** glibc malloc's getHeapUsage() - even if jemalloc is used, the malloc version is
+     * still accessible here, in the malloc namespace. As glibc's malloc is still resident,
+     * together with jemalloc, it makes sense to access its stats as well
+     */
+    export function getHeapUsage(): HeapUsage;
 }
 
 export namespace jemalloc {
