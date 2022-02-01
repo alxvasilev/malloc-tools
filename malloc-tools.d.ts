@@ -61,8 +61,14 @@ export namespace malloc {
 }
 
 export namespace jemalloc {
-    /** All ctlGetXXX() functions map to the mallctl() interface of jemalloc,
-     * in read mode, for the corresponding type
+    /** Updates jemalloc's stats data. Without calling this, stats numbers will not update and will
+     * be the same every time they are queries. Therefore, this function must be called periodically
+     * by the js code. Note that the jemalloc's version of the common getHeapUsage() internally does
+     * this, so this detail is transparent for that generic API
+     */
+    export function updateStats(): void;
+    /** All ctlGetXXX() / ctlSetXXX() functions map to the mallctl() interface of jemalloc,
+     * in read / write mode, for the corresponding type
      */
     export function ctlGetSize(name: string): number;
     export function ctlGetSSize(name: string): number;
@@ -71,5 +77,8 @@ export namespace jemalloc {
     export function ctlGetU32(name: string): number;
     export function ctlGetU64(name: string): number;
     export function ctlGetUnsigned(name: string): number;
+    export function ctlSetSize(name: string, val: number): void;
+    export function ctlSetSSize(name: string, val: number): void;
+    export function ctlSetUnsigned(name: string, val: number): void;
     export function flushThreadCache(): void;
 }

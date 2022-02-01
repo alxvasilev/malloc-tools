@@ -38,6 +38,7 @@ function jeLogBoolParam(name) {
 function testJemalloc(jemalloc) {
     console.log("============= jemalloc stats ===============");
     console.log("version:", jemalloc.ctlGetString("version"));
+    console.log(`arenas.narenas: ${jemalloc.ctlGetUnsigned("arenas.narenas")}`);
     jeLogSizeParam("stats.mapped");
     jeLogSizeParam("stats.allocated");
     jeLogSizeParam("stats.resident");
@@ -48,6 +49,7 @@ function testJemalloc(jemalloc) {
     jeLogBoolParam("config.debug");
     jeLogBoolParam("background_thread");
     console.log("max_background_threads:", jemalloc.ctlGetSize("max_background_threads"));
+    jemalloc.ctlSetSSize("arenas.dirty_decay_ms", 100);
 }
 
 async function main() {
@@ -63,5 +65,6 @@ async function main() {
     } else {
         console.error("Unknown allocator in use:", tools.allocator);
     }
+    console.log("Done");
 }
 main();

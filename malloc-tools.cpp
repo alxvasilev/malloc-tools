@@ -168,14 +168,54 @@ Value jeRead(const CallbackInfo& info)
     return jeDoRead<T>(arg.ToString().Utf8Value().c_str(), env);
 }
 
+template<typename T, typename JT>
+Value jeDoWrite(const char* name, Value jsVal, Napi::Env& env)
+{
+    T val = static_cast<JT>(jsVal.As<Number>());
+    auto err = mallctl(name, nullptr, 0, &val, sizeof(val));
+    THROW_ON_ERROR(err);
+    return env.Undefined();
+}
+
+template <typename T, typename JT>
+Value jeWrite(const CallbackInfo& info)
+{
+    Napi::Env env = info.Env();
+    if (info.Length() != 2) {
+        Error::New(env, "Wrong number of arguments, must be 2").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    Value name = info[0];
+    if (!name.IsString()) {
+        Error::New(env, "Argument 1 is not a string").ThrowAsJavaScriptException();
+        return env.Undefined();
+    }
+    return jeDoWrite<T, JT>(name.ToString().Utf8Value().c_str(), info[1], env);
+}
+
 void jenFlushThreadCache()
 {
     mallctl("thread.tcache.flush", NULL, NULL, NULL, 0);
 }
+
+int jenUpdateEpoch()
+{
+    uint64_t epoch = time(nullptr);
+    return mallctl("epoch", nullptr, 0, &epoch, sizeof(epoch));
+}
+
+Value jeUpdateEpoch(const CallbackInfo& info)
+{
+    Env env = info.Env();
+    auto err = jenUpdateEpoch();
+    THROW_ON_ERROR(err);
+    return env.Undefined();
+}
+
 Value jeGetHeapUsage(const CallbackInfo& info)
 {
     Env env = info.Env();
-    jenFlushThreadCache();
+    jenUpdateEpoch();
     size_t used, total, retained;
 /*
     see https://github.com/jemalloc/jemalloc/issues/1882#issuecomment-662745494
@@ -228,7 +268,11 @@ Object jeCreateNamespace(Env env) {
     ns.Set("ctlGetString", Function::New(env, jeRead<const char*>));
     ns.Set("ctlGetBool", Function::New(env, jeRead<bool>));
     ns.Set("ctlGetUnsigned", Function::New(env, jeRead<unsigned>));
+    ns.Set("ctlSetSize", Function::New(env, jeWrite<size_t, int64_t>));
+    ns.Set("ctlSetSSize", Function::New(env, jeWrite<ssize_t, int64_t>));
+    ns.Set("ctlSetUnsigned", Function::New(env, jeWrite<unsigned, int64_t>));
     ns.Set("flushThreadCache", Function::New(env, jeFlushThreadCache));
+    ns.Set("updateStats", Function::New(env, jeUpdateEpoch));
     return ns;
 }
 Object Init(Env env, Object exports)

@@ -1,6 +1,6 @@
 {
   "name": "malloc-tools",
-  "version": "2.0.6",
+  "version": "2.0.11",
   "description": "Exposes stats and management functions of glibc's malloc and jemalloc",
   "homepage": "https://github.com/alxvasilev/malloc-tools#readme",
   "repo": "https://github.com/alxvasilev/malloc-tools",
